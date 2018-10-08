@@ -1,15 +1,21 @@
 # pins_tiles
 Implements data types for Pin(lat, lng), BaseTile(x, y, zoom), and Tile(x, y, zoom, img)  
 
-A Pin is a namedtuple with methods attached to it, and is thus immutable. It allows direct population of the longitude and latitude parameters and also calculates a pin from other sorts of data.  
+A **Pin** is a namedtuple with methods attached to it, and is thus immutable. It allows direct population of the longitude and latitude parameters and also calculates a pin from other sorts of data.  
 
-A Tile is a namedtuple with an immutable base class BaseTile. A tile is created with an (x, y, zoom) tuple and adds itself to a queue that fetches the image (currently only works with google). A tile can also be created from a pin returning the tile containing that pin. If created from a list of pins, it returns a list of tiles that spans the entire area taken by the pins.
+A **Tile** is a namedtuple with an immutable base class BaseTile. A tile is created with an (x, y, zoom) tuple and adds itself to a queue that fetches the image (currently works with google). A tile can also be created from a pin returning the tile containing that pin. If created from a list of pins, it returns a list of tiles that spans the entire area taken by the pins.
 
-Utility function get_bounded_map will build a map from a bound defind by a set of pins and return a map composited from individual tiles and cropped to the bound.
+Tiles are fetched by an asynchronous daemon.
 
-Tiles are cached to disk in a lazy method that allows it to grow indefinitely.
+Tiles are cached to disk with simple algorithm: if the tile is already on disk, use that one; if the tile is not on disk, fetch it and store it to disk. Filename format is x_y_zoom_servicename.png.
 
-Math follows:
+Utility function **get_bounded_map()** will build a map from a bound defind by a set of pins and return a map composited from individual tiles and cropped to the bound. Detail level 1 corresponds to the tile zoom where 1 tile can contain all of the pins and each increasing detail level doubles that.
+
+I use **get_bounded_map()** to plot longitude, latitude traces of my car data from a OBD2 adapter on a matplotlib canvas.
+
+Utility function **tile_up()** takes a list of tiles and composits them into a mosaic, returning the composite image along with its (lat, long) bounds. This is called by **get_bounded_map()** to create the canvas.
+
+Math follows because there is a (latitude, longitude) to tile coordinate conversion:
 
 From Wolfram: http://mathworld.wolfram.com/MercatorProjection.html
 
