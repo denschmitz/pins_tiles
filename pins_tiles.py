@@ -68,8 +68,9 @@ R2D = 180.0 / pi # radians to degrees
 CHICAGO = (41.850, -87.650)
 MAX_ZOOM = 20
 TILE_CACHE_FOLDER = r'd:\tilecache'
+TILE_FETCH_THREADS = 4 # why 4? just because, man.
+SERVICE = 'osm'
 
-BaseCoord = namedtuple('BaseCoord', 'x y')
 
 # constructor checks
 # (it might be getter to let the functions crash- i haven'e decided)
@@ -192,12 +193,14 @@ def tile_up(*args): # take tiles or lists of tiles, or sets of tiles
     ne_pin = Pin.from_tile_coord(max(X)+1, min(Y), zoom) # plus one tile n and e because the point will be the sw corner of the tile
 
     # make blank canvas
-    canvas = Image.new("RGB", ((ptp(X)+1) * TILE_SIZE, (ptp(Y)+1) * TILE_SIZE)) # (x,y) peak to peak = number of tiles * TILE_SIZE
+    canvas = Image.new("RGBA", ((ptp(X)+1) * TILE_SIZE, (ptp(Y)+1) * TILE_SIZE)) # (x,y) peak to peak = number of tiles * TILE_SIZE
 
     #print("canvas size:",canvas.size)
 
     for tile in tiles:
+        #print(vars(tile))
         # tile.img.show()
+        
         px_x = (tile.x - min(X)) * TILE_SIZE
         px_y = (tile.y - min(Y)) * TILE_SIZE
         #print(px_x, px_y)
@@ -249,15 +252,39 @@ def get_bounded_map(bounds, detail=0):
 
 # background tile fetcher and cache system
 
-def fetch_google_tile(tile_queue):
-    """intended to be started as a daemon thread
-    i suggest starting 4 of them
-    """
+tile_urls = {'stamanwatercolor': 'http://c.tile.stamen.com/watercolor/{2}/{0}/{1}.jpg',
+             'stamantoner': 'http://a.tile.stamen.com/toner/{2}/{0}/{1}.png',
+             'osm': 'https://a.tile.openstreetmap.org/{2}/{0}/{1}.png',
+             'wikimedia': 'https://maps.wikimedia.org/osm-intl/{2}/{0}/{1}.png', 
+             'hillshading': 'http://c.tiles.wmflabs.org/hillshading/{2}/{0}/{1}.png',
+             }
+
+def fetch_tile(tile_queue, service):
+    """daemon thread dispatcher"""
+    if service == 'google':
+        fetch_google_tile(tile_queue, service)
+    elif service in tile_urls:
+        fetch_generic_tile(tile_queue, service)
+
+def fetch_generic_tile(tile_queue, service):
+    """intended to be started as a daemon thread"""
+    while True:
+        a_tile = tile_queue.get()
+        a_tile.img = get_cached_tile(a_tile, service)
+        if a_tile.img is None:
+            a_tile.http_resp = get(tile_urls[service].format(*a_tile))   
+            a_tile.img = get_pic(a_tile.http_resp)
+            assert not a_tile.img is None, a_tile.http_resp.request.url + " failed " + str(a_tile.http_resp.status_code)
+            put_cached_tile(a_tile, service)
+        tile_queue.task_done()
+
+def fetch_google_tile(tile_queue, service):
+    """intended to be started as a daemon thread"""
     #tile_url = "http://mt1.google.com/vt/"
     tile_url = "https://mts1.google.com/vt/"
     while True:
         a_tile = tile_queue.get()
-        a_tile.img = get_cached_tile(a_tile, 'google')
+        a_tile.img = get_cached_tile(a_tile, service)
         if a_tile.img is None:
             params = {
                 'lyrs': 'y',
@@ -265,8 +292,9 @@ def fetch_google_tile(tile_queue):
                 'y': a_tile.y,
                 'z': a_tile.zoom,
                 }
-            a_tile.img = get_pic(get(tile_url, params))
-            put_cached_tile(a_tile, 'google')
+            a_tile.http_resp = get(tile_url, params)
+            a_tile.img = get_pic(a_tile.http_resp)
+            put_cached_tile(a_tile, service) 
         tile_queue.task_done()
 
 def get_cached_tile(tile, service):
@@ -288,7 +316,33 @@ def put_cached_tile(tile, service):
         tile.img.save(file)
 
 
-class Pin(namedtuple('BasePin', 'latitude longitude')):
+XY = namedtuple("XY", "x y") # origin upper right image processing
+
+class PixCoord(XY): # invented to keep X, Y and Row, Col straight
+    @classmethod
+    def from_rowcol(cls, row=0, col=0):
+        """Creates an XY point from rowcol"""
+        return cls(col, row)
+
+    @property
+    def row(self):
+        """returns the y"""
+        return self.y
+
+    @property
+    def col(self):
+        """returns the x"""
+        return self.x
+
+    @property
+    def rowcol(self):
+        """returns the y, x"""
+        return self.y, self.x
+
+
+BasePin = namedtuple('BasePin', 'latitude longitude')
+
+class Pin(BasePin):
     """Immutable Pin class
     # the only actual data stored is lat/lng in the base namedtuple class
     # WGS84 (GPS reference)
@@ -455,8 +509,8 @@ class Tile(BaseTile):
 
     new_tile_q = Queue() # tiles waiting for images
     threads = [] # list of threads in case they need killin'
-    for i in range(4): # start up 4 threads to process tiles
-        t = Thread(target=fetch_google_tile, args=(new_tile_q,))
+    for i in range(TILE_FETCH_THREADS): # start up some threads to process tiles
+        t = Thread(target=fetch_tile, args=(new_tile_q, SERVICE))
         threads.append(t)
         t.daemon = True
         t.start()
