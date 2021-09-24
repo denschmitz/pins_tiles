@@ -11,7 +11,7 @@ Utility function **get_bounded_map()** will build a map from a bound defind by a
 
 I use **get_bounded_map()** to plot longitude, latitude traces of my car data from a OBD2 adapter on a matplotlib canvas.
 
-![get_bounded_map() example used as a matplotlib plotting canvas](https://raw.githubusercontent.com/denschmitz/pins_tiles/master/example.png)
+![get_bounded_map() example used as a matplotlib plotting canvas](https://raw.githubusercontent.com/denschmitz/pins_tiles/master/map.png)
 
 Utility function **tile_up()** takes a list of tiles and composits them into a mosaic, returning the composite image along with its (lat, long) bounds. This is called by **get_bounded_map()** to create the canvas.
 
