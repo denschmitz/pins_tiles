@@ -1,4 +1,9 @@
 # pins_tiles
+## installation
+
+<pre>pip install https://github.com/denschmitz/pins_tiles/archive/refs/heads/master.zip</pre>
+
+## description
 Implements data types for Pin(lat, lng), BaseTile(x, y, zoom), and Tile(x, y, zoom, img)  
 
 A **Pin** is a namedtuple with methods attached to it, and is thus immutable. It allows direct population of the longitude and latitude parameters and also calculates a pin from other sorts of data.  
