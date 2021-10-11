@@ -15,11 +15,15 @@ I use **get_bounded_map()** to plot longitude, latitude traces of my car data fr
 
 Utility function **tile_up()** takes a list of tiles and composits them into a mosaic, returning the composite image along with its (lat, long) bounds. This is called by **get_bounded_map()** to create the canvas.
 
-Math follows because there is a (latitude, longitude) to tile coordinate conversion:
-
-From Wolfram: http://mathworld.wolfram.com/MercatorProjection.html
+# Math follows because there is a (latitude, longitude) to tile coordinate conversion:
 
 There is quite a bit of material on converting long/lat to tiles. It all comes to dividing a Mercator projection into little squares. The square that has the whole world is zoom level 0, with doubling each level. The mapping services deliver square png or gif images to cover the area.
+
+If you look at the image below, you can see that the level zero tile doesn't include the poles if you try to make a square holding the world; this is because the projection puts the poles at infinity. This also means that the closer you get to the poles, the less square the area the tile represents. This doesn't mean anything other than you may have to tweak the aspect ratio of your plots near the poles. TODO: integrate aspect adjustment to get_bounded_map() for people who hate the sun.
+
+All of the conversions are routed through the same forward and backward transforms for clarity.
+
+Below is material from Wolfram: http://mathworld.wolfram.com/MercatorProjection.html
 
 <img src="http://mathworld.wolfram.com/images/eps-gif/MercatorProjection_1000.gif">
 
