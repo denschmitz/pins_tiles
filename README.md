@@ -15,7 +15,7 @@ I use **get_bounded_map()** to plot longitude, latitude traces of my car data fr
 
 Utility function **tile_up()** takes a list of tiles and composits them into a mosaic, returning the composite image along with its (lat, long) bounds. This is called by **get_bounded_map()** to create the canvas.
 
-# Math follows because there is a (latitude, longitude) to tile coordinate conversion:
+## Math follows because there is a (latitude, longitude) to tile coordinate conversion:
 
 There is quite a bit of material on converting long/lat to tiles. It all comes to dividing a Mercator projection into little squares. The square that has the whole world is zoom level 0, with doubling each level. The mapping services deliver square png or gif images to cover the area.
 
