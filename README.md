@@ -1,7 +1,7 @@
 # pins_tiles
 ## installation
 
-<pre>pip install https://github.com/denschmitz/pins_tiles/archive/refs/heads/master.zip</pre>
+<pre>pip3 install https://github.com/denschmitz/pins_tiles/archive/refs/heads/master.zip</pre>
 
 ## description
 Implements data types for Pin(lat, lng), BaseTile(x, y, zoom), and Tile(x, y, zoom, img)  
