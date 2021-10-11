@@ -19,6 +19,8 @@ Math follows because there is a (latitude, longitude) to tile coordinate convers
 
 From Wolfram: http://mathworld.wolfram.com/MercatorProjection.html
 
+There is quite a bit of material on converting long/lat to tiles. It all comes to dividing a Mercator projection into little squares. The square that has the whole world is zoom level 0, with doubling each level. The mapping services deliver square png or gif images to cover the area.
+
 <img src="http://mathworld.wolfram.com/images/eps-gif/MercatorProjection_1000.gif">
 
 The Mercator projection is a map projection that was widely used for navigation since loxodromes are straight lines (although great circles are curved). The following equations place the x-axis of the projection on the equator and the y-axis at longitude <a href="https://www.codecogs.com/eqnedit.php?latex=\lambda_{0}" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\lambda_{0}" title="\lambda_{0}" /></a>, where <a href="https://www.codecogs.com/eqnedit.php?latex=\lambda" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\lambda" title="\lambda" /></a> is the longitude and <a href="https://www.codecogs.com/eqnedit.php?latex=\phi" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\phi" title="\phi" /></a> is the latitude.
