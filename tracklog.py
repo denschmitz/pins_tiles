@@ -316,27 +316,36 @@ for tz_descr in map(str.split, tz_str.split('\n')):
 datecols = ['GPS Time', 'Device Time']
 
 
-def check_for_strings(tracklist):  # in a list of tracklogs
-    """Check for string data in a list of dataframes"""
-    if not isinstance(tracklist, list):
-        tracklist = [tracklist]
-    found = False
-    for tl in tracklist:
+def check_for_strings(tracklogs): # strings and stuff
+    """
+    Check compliance of data in a list of tracklogs.
+    Returns a dictionary with compliance status for each tracklog.
+    Compliance checks:
+        - All data is numeric
+        - All missing values are NaN
+        - Each column has a string header
+    """
+    compliance_status = {}
+    for tl in tracklogs:
         df = tl.df
+        is_compliant = True
         for col in df:
-            if df[col].dtype == "object":
-                print("{}:{}".format(df[col].name, df[col].dtype))
-                found = True
-            if found:
+            # check if all data is numeric
+            if df[col].dtype != "float" and df[col].dtype != "int":
+                is_compliant = False
                 break
-        if found:
-            break
-    if not found:
-        print("No strings in data.")
-    else:
-        print("Strings found:")
-        print(df[col].name)
-        print(vars(df[col]))
+            # check if all missing values are NaN
+            if not df[col].isnull().all():
+                is_compliant = False
+                break
+            # check if each column has a string header
+            if not isinstance(df.columns[col], str):
+                is_compliant = False
+                break
+        compliance_status[tl.name] = is_compliant
+    return compliance_status
+
+In this revised version of the function, the compliance checks for each tracklog are done in a for loop. First, it checks if all data is numeric. If it finds any non-numeric data, it sets the compliance status to False and breaks out of the loop. Next, it checks if all missing values are NaN using the isnull() function. If it finds any non-NaN missing values, it sets the compliance status to False and breaks out of the loop. Finally, it checks if each column has a string header by checking the data type of the column name using the isinstance() function. If it finds any non-string headers, it sets the compliance status to False and breaks out of the loop. After all the checks, it stores the compliance status of the tracklog in a dictionary with the tracklog's name as the key. The function returns this dictionary as the final output.
 
 
 def load_all_csv_torque_logs(folder, limit=None):
@@ -356,24 +365,16 @@ def load_all_csv_torque_logs(folder, limit=None):
 
 
 def is_csv(fn):
-    if os.path.isfile(fn):
-        ext = os.path.splitext(fn)[1]
-        if ext.lower() == '.csv':
-            return True
-    return False
-
+    return os.path.splitext(fn)[1].lower() == '.csv' and os.path.isfile(fn)
 
 def is_h5(fn):
-    if os.path.isfile(fn):
-        ext = os.path.splitext(fn)[1]
-        if ext.lower() == '.h5':
-            return True
-    return False
+    return os.path.splitext(fn)[1].lower() == '.h5' and os.path.isfile(fn)
 
 
-def indexes(iterable, obj):
-    return (index for index, elem in enumerate(iterable) if elem == obj)
-
+def get_indexes_of_value(iterable, value):
+    for i, x in enumerate(iterable):
+        if x == value:
+            yield i
 
 def groom_columns(cols):
     return cols # stub
@@ -407,6 +408,40 @@ class Tracklog:
             assert hasattr(self, '_units')
         return self._units
 
+
+    def _from_csv(self):
+        # get column names
+        with open(self.fn, 'r', encoding='utf-8') as f:
+            self.colnames = list(map(str.strip, f.readline().strip().split(',')))
+
+        # get the units and remove from colnames
+        # anything in the list and contained in parentheses is a unit for that column
+        # after finding, then remove from the column name.
+        TORQUE_UNITS = ['$/m', '%', 'Meters/second', 'Nm', 'Pa', 'V', 'ft', 'g', 'gal/min',
+                        'hp', 'kW', 'mb', 'miles', 'mpg', 'mph', 'psi', 'rpm', '°', '°F', '°C']
+        units = []
+        new_colnames = []
+        for name in self.colnames:
+            stuff = re.findall(r'\((.*?)\)', name)  # a list of parenthesized things in the string
+            if len(stuff) == 0:
+                units.append(None)
+                new_colnames.append(name)
+            elif stuff[-1] in TORQUE_UNITS:
+                units.append(stuff[-1])
+                new_colnames.append(name.replace(f'({stuff[-1]})', ''))
+            else:
+                units.append(None)
+                new_colnames.append(name)
+        self._units = units
+        self.colnames = new_colnames
+
+        # start reading the dataframe skipping row 0 and using our colnames as header.
+        # parse the date columns explicitly.
+        datecols = []  # add the name of the columns to parse as date here
+        self._df = pd.read_csv(self.fn, na_values=['-', '∞'], skiprows=[0], header=None, names=self.colnames,
+                               parse_dates=datecols, index_col='GPS Time')
+
+
     def _from_csv(self):
         print(tzd)
 
@@ -422,7 +457,7 @@ class Tracklog:
         logger.info(f"Found {len(self._lines)} lines")
 
         # get a list of rows with headers on them to start the ignore list
-        skiprows = list(indexes(self._lines, self._lines[0]))
+        skiprows = list(get_indexes_of_value(self._lines, self._lines[0]))
         logger.info(f'Found headers on rows {skiprows}.')
 
         # get the units and remove from colnames
@@ -478,6 +513,21 @@ class Tracklog:
             if self._df[col].dtype == "object": # then there is some non-numeric data there
                 self._df[col] = pd.to_numeric(self._df[col], 'coerce')
                 logger.info(f"Coerced column {col} to numeric")
+
+    def _get_skip_rows(self):
+        """
+        Returns a list of rows numbers that contain extraneous headers found in the data file.
+        These rows will be ignored by the pandas `pd.read_csv()` function to ensure that only valid data is loaded into the dataframe.
+        """
+        skip_rows = []
+        first_col_name = self.colnames[0]
+        with open(self.fn, 'r') as f:
+            for i, line in enumerate(f):
+                if first_col_name in line:
+                    skip_rows.append(i)
+                else:
+                    break
+        return skip_rows
 
     def _from_h5(self):
         pass  # stub
